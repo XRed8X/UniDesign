@@ -32,6 +32,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "SmallMolParAndTopo.h"
 #include "EvoAminoName.h"
 #include "ProgramPreprocess.h"
+#include "GAOptimizer.h"
 
 #define  PROGRAM_PARAMETERS
 
@@ -116,6 +117,16 @@ double CUT_PLI_DIST_SHELL1 = 5.0;
 double CUT_PLI_DIST_SHELL2 = 8.0;
 // Set default desType
 Type_ResidueDesignType DEFAULT_RESIDUE_DESIGNTYPE = Type_DesType_Fixed;
+
+// Parameters for optimizer selection and GA
+char OPTIMIZER[MAX_LEN_FILE_NAME + 1] = "SAMC";  // Default: Simulated Annealing Monte Carlo
+int  GA_POPULATION_SIZE = 100;                    // Default population size for GA
+int  GA_MAX_GENERATIONS = 50;                     // Default max generations for GA
+double GA_CROSSOVER_RATE = 0.8;                   // Default crossover rate for GA
+double GA_MUTATION_RATE = 0.1;                    // Default mutation rate for GA
+int  GA_ELITE_COUNT = 2;                          // Default elite count for GA
+BOOL GA_USE_TOURNAMENT = TRUE;                    // Use tournament selection
+int  GA_TOURNAMENT_SIZE = 3;                      // Tournament size for selection
 
 // Parameters for EnzymeDesign
 // user should specify three initial atoms for creating small-molecule topology
@@ -321,6 +332,13 @@ struct option LONG_OPTS[] = {
   {"resi_pair",            required_argument, NULL,   60},
   {"excl_resi",            required_argument, NULL,   61},
   {"lig_placing",          required_argument, NULL,   62},
+  {"optimizer",            required_argument, NULL,  100}, // GA or SAMC optimizer
+  {"ga_population",        required_argument, NULL,  101}, // GA population size
+  {"ga_generations",       required_argument, NULL,  102}, // GA max generations
+  {"ga_crossover",         required_argument, NULL,  103}, // GA crossover rate
+  {"ga_mutation",          required_argument, NULL,  110}, // GA mutation rate
+  {"ga_elite",             required_argument, NULL,  105}, // GA elite count
+  {"ga_tournament_size",   required_argument, NULL,  106}, // GA tournament size
   {NULL,                   no_argument,       NULL,    0},
 };
 
@@ -672,6 +690,27 @@ int main(int argc, char* argv[])
     case 62:
       strcpy(FILE_LIG_PLACEMENT, optarg);
       break;
+    case 100:
+      strcpy(OPTIMIZER, optarg);
+      break;
+    case 101:
+      GA_POPULATION_SIZE = atoi(optarg);
+      break;
+    case 102:
+      GA_MAX_GENERATIONS = atoi(optarg);
+      break;
+    case 103:
+      GA_CROSSOVER_RATE = atof(optarg);
+      break;
+    case 110:
+      GA_MUTATION_RATE = atof(optarg);
+      break;
+    case 105:
+      GA_ELITE_COUNT = atoi(optarg);
+      break;
+    case 106:
+      GA_TOURNAMENT_SIZE = atoi(optarg);
+      break;
     case 37:
       strcpy(PREFIX, optarg);
       break;
@@ -955,7 +994,28 @@ int main(int argc, char* argv[])
     RotamerListWrite(&rotList, FILE_ROTLIST_SEC);
     RotamerListRead(&rotList, FILE_ROTLIST_SEC);
     StructureShowDesignSitesAfterRotamerDelete(&structure, &rotList);
-    SimulatedAnnealing(&structure, &rotList);
+    
+    // Choose optimizer: GA or SAMC
+    if (strcmp(OPTIMIZER, "GA") == 0)
+    {
+      // Use Genetic Algorithm optimizer
+      GAParameters ga_params;
+      ga_params.population_size = GA_POPULATION_SIZE;
+      ga_params.max_generations = GA_MAX_GENERATIONS;
+      ga_params.crossover_rate = GA_CROSSOVER_RATE;
+      ga_params.mutation_rate = GA_MUTATION_RATE;
+      ga_params.elite_count = GA_ELITE_COUNT;
+      ga_params.use_tournament_selection = GA_USE_TOURNAMENT;
+      ga_params.tournament_size = GA_TOURNAMENT_SIZE;
+      
+      RunGAOptimization(&structure, &rotList, ga_params);
+    }
+    else
+    {
+      // Default: use Simulated Annealing Monte Carlo (SAMC)
+      SimulatedAnnealing(&structure, &rotList);
+    }
+    
     RotamerListDestroy(&rotList);
   }
 
